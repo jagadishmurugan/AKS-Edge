@@ -15,8 +15,41 @@ param(
     [Switch] $UseK8s=$false,
     [string] $Tag
 )
+
+function New-ConnectedCluster
+{
+param(
+    [Parameter(Mandatory=$true)]
+    [string] $resourceGroup,
+    [Parameter(Mandatory=$true)]
+    [string] $location,
+    [Parameter(Mandatory=$true)]
+    [string] $clusterName,
+    [Parameter(Mandatory=$true)]
+    [string] $subscriptionId <#,
+    [Parameter(Mandatory=$true)]
+    [string] $connectedK8sPrivateWhlPath#>
+)
+
+    $tags = @("SKU=AKSEdgeEssentials")
+    $modVersion = (Get-Module AksEdge).Version
+    if ($modVersion) { 
+        $tags += @("Version=$modVersion")
+    }
+    $infra = Get-AideInfra
+    if ($infra) { 
+        $tags += @("Infra=$infra")
+    }
+    $clusterid = $(kubectl get configmap -n aksedge aksedge -o jsonpath="{.data.clustername}")
+    if ($clusterid) { 
+        $tags += @("ClusterId=$clusterid")
+    }
+
+    az connectedk8s connect -n $clusterName -l $location -g $resourceGroup --subscription $subscriptionId --tags $tags | Out-Null
+}
+
 #Requires -RunAsAdministrator
-New-Variable -Name gAksEdgeQuickStartForAioVersion -Value "1.0.240419.1300" -Option Constant -ErrorAction SilentlyContinue
+New-Variable -Name gAksEdgeQuickStartForAioVersion -Value "1.0.240612.1300" -Option Constant -ErrorAction SilentlyContinue
 
 # Specify only AIO supported regions
 New-Variable -Option Constant -ErrorAction SilentlyContinue -Name arcLocations -Value @(
@@ -90,7 +123,7 @@ $aideuserConfig = @"
 "@
 $aksedgeConfig = @"
 {
-    "SchemaVersion": "1.9",
+    "SchemaVersion": "1.14",
     "Version": "1.0",
     "DeploymentType": "SingleMachineCluster",
     "Init": {
@@ -204,20 +237,7 @@ az provider register -n "Microsoft.DeviceRegistry"
 # Arc-enable the Kubernetes cluster
 Write-Host "Arc enable the kubernetes cluster $ClusterName" -ForegroundColor Cyan
 
-$tags = @("SKU=AKSEdgeEssentials")
-$modVersion = (Get-Module AksEdge).Version
-if ($modVersion) { 
-    $tags += @("Version=$modVersion") 
-}
-$infra = Get-AideInfra
-if ($infra) { 
-    $tags += @("Infra=$infra") 
-}
-$clusterid = $(kubectl get configmap -n aksedge aksedge -o jsonpath="{.data.clustername}")
-if ($clusterid) { 
-    $tags += @("ClusterId=$clusterid") 
-}
-az connectedk8s connect -n $ClusterName -l $Location -g $ResourceGroupName --subscription $SubscriptionId --tags $tags | Out-Null
+New-ConnectedCluster -clusterName $ClusterName -location $Location -resourcegroup $ResourceGroupName -subscriptionId $SubscriptionId | Out-Null
 
 # Enable custom location support on your cluster using az connectedk8s enable-features command
 Write-Host "Associate Custom location with $ClusterName cluster"
