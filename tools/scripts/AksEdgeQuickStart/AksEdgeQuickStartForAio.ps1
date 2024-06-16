@@ -1,6 +1,9 @@
 <#
   QuickStart script for setting up Azure for AKS Edge Essentials and deploying the same on the Windows device
 #>
+
+#Requires -RunAsAdministrator
+
 param(
     [ValidateNotNullOrEmpty()]
     [String] $SubscriptionId,
@@ -13,7 +16,12 @@ param(
     [ValidateNotNullOrEmpty()]
     [String] $ClusterName,
     [Switch] $UseK8s=$false,
-    [string] $Tag
+    [string] $Tag,
+    # Temporary params for private bits
+    [Parameter(Mandatory=$true)]
+    [string] $connectedK8sPrivateWhlPath,
+    [Parameter(Mandatory=$true)]
+    [string] $helmPath
 )
 
 function New-ConnectedCluster
@@ -26,9 +34,9 @@ param(
     [Parameter(Mandatory=$true)]
     [string] $clusterName,
     [Parameter(Mandatory=$true)]
-    [string] $subscriptionId <#,
+    [string] $subscriptionId,
     [Parameter(Mandatory=$true)]
-    [string] $connectedK8sPrivateWhlPath#>
+    [string] $connectedK8sPrivateWhlPath
 )
 
     $tags = @("SKU=AKSEdgeEssentials")
@@ -45,10 +53,35 @@ param(
         $tags += @("ClusterId=$clusterid")
     }
 
-    az connectedk8s connect -n $clusterName -l $location -g $resourceGroup --subscription $subscriptionId --tags $tags | Out-Null
+    az extension remove --name connectedk8s | Out-Null
+    az extension add --source $connectedK8sPrivateWhlPath --allow-preview true | Out-Null
+    $env:HELMREGISTRY="azurearcfork8sdev.azurecr.io/merge/private/azure-arc-k8sagents:0.1.14275-private"
+    az connectedk8s connect -g $resourceGroup -n $clusterName --subscription $subscriptionId --tags $tags --disable-auto-upgrade --enable-oidc-issuer | Out-Null
 }
 
-#Requires -RunAsAdministrator
+function Restart-ApiServer
+{
+param(
+    [Parameter(Mandatory=$true)]
+    [string] $serviceAccountIssuer
+)
+    Write-Host "serviceAccountIssuer =  $serviceAccountIssuer"
+    $retVal = Invoke-EflowVmCommand "sudo cp /etc/kubernetes/manifests/kube-apiserver.yaml /home/aksedge-user"
+    $retVal = Invoke-EflowVmCommand "sudo cp /etc/kubernetes/manifests/kube-apiserver.yaml /home/aksedge-user/kube-apiserver.yaml.org"
+    $retVal = Invoke-EflowVmCommand "sudo sed -i 's|service-account-issuer.*|service-account-issuer=$serviceAccountIssuer|' /home/aksedge-user/kube-apiserver.yaml"
+
+    $retVal = Invoke-EflowVmCommand "sudo cp /home/aksedge-user/kube-apiserver.yaml /etc/kubernetes/manifests/kube-apiserver.yaml"
+    <#
+    if ($LASTEXITCODE -ne 0)
+    {
+        Write-Host "eror - $retVal"
+    }
+    #>
+
+    Invoke-EflowVmCommand "sudo systemctl restart k3s.service"
+    Start-Sleep -Seconds 10
+}
+
 New-Variable -Name gAksEdgeQuickStartForAioVersion -Value "1.0.240612.1300" -Option Constant -ErrorAction SilentlyContinue
 
 # Specify only AIO supported regions
@@ -238,6 +271,22 @@ az provider register -n "Microsoft.DeviceRegistry"
 Write-Host "Arc enable the kubernetes cluster $ClusterName" -ForegroundColor Cyan
 
 New-ConnectedCluster -clusterName $ClusterName -location $Location -resourcegroup $ResourceGroupName -subscriptionId $SubscriptionId | Out-Null
+
+$serviceAccountIssuer = az connectedk8s show-issuer-url
+if ([string]::IsNullOrEmpty($serviceAccountIssuer))
+{
+    Write-Host "az connectedk8s show-issuer-url returned empty URL!"
+    $jsonString = kubectl get signingkeys.clusterconfig.azure.com -n azure-arc signingkey -o json
+    $jsonObj = $jsonString | ConvertFrom-Json
+    $serviceAccountIssuer = $jObj.status.clusterIssuerUrl
+    if ([string]::IsNullOrEmpty($serviceAccountIssuer))
+    {
+        throw "invalid IssuerUrl!"
+    }
+}
+
+Write-Host "serviceAccountIssuer = $serviceAccountIssuer"
+Restart-ApiServer -serviceAccountIssuer $serviceAccountIssuer
 
 # Enable custom location support on your cluster using az connectedk8s enable-features command
 Write-Host "Associate Custom location with $ClusterName cluster"
