@@ -61,6 +61,37 @@ param(
     Wait-ApiServerReady
 }
 
+function Verify-ConnectedStatus
+{
+param(
+    [Parameter(Mandatory=$true)]
+    [string] $resourceGroup,
+    [Parameter(Mandatory=$true)]
+    [string] $clusterName,
+    [Parameter(Mandatory=$true)]
+    [string] $subscriptionId
+)
+
+    $retries = 20
+    for (; $retries -gt 0; $retries--)
+    {
+        $connectedCluster = az connectedk8s show -g $resourceGroup -n $clusterName --subscription $subscriptionId | ConvertFrom-Json
+        if($connectedCluster.ConnectivityStatus -eq "Connected")
+        {
+            Write-Host "Cluster reached connected status"
+            break
+        }
+
+        Write-Host "Arc connection status is $($connectedCluster.ConnectivityStatus). Waiting for status to be connected..."
+        Start-Sleep -Seconds 10
+    }
+
+    if ($retries -eq 0)
+    {
+        exit -1
+    }
+}
+
 function New-ConnectedCluster
 {
 param(
@@ -95,6 +126,8 @@ param(
     az extension add --source $connectedK8sPrivateWhlPath --allow-preview true -y
     $env:HELMREGISTRY="azurearcfork8sdev.azurecr.io/merge/private/azure-arc-k8sagents:0.1.14275-private"
     az connectedk8s connect -g $resourceGroup -n $clusterName --subscription $subscriptionId --tags $tags --disable-auto-upgrade --enable-oidc-issuer
+
+    Verify-ConnectedStatus -clusterName $ClusterName -resourcegroup $ResourceGroupName -subscriptionId $SubscriptionId
 
     $serviceAccountIssuer = az connectedk8s show-issuer-url
     if ([string]::IsNullOrEmpty($serviceAccountIssuer))
