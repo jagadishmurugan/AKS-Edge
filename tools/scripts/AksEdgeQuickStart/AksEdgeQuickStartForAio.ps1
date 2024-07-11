@@ -81,7 +81,7 @@ param(
     [string] $subscriptionId
 )
 
-    $retries = 20
+    $retries = 60
     for (; $retries -gt 0; $retries--)
     {
         $connectedCluster = az connectedk8s show -g $resourceGroup -n $clusterName --subscription $subscriptionId | ConvertFrom-Json
