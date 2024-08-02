@@ -135,10 +135,24 @@ param(
         $tags += @("ClusterId=$clusterid")
     }
 
-    az extension remove --name connectedk8s
-    az extension add --source $connectedK8sPrivateWhlPath --allow-preview true -y
+    $errOut = $($retVal = & {az extension remove --name connectedk8s}) 2>&1
+    if ($LASTEXITCODE -ne 0)
+    {
+        throw "Error removing extension connecktedk8s : $errOut"
+    }
+
+    $errOut = $($retVal = & {az extension add --source $connectedK8sPrivateWhlPath --allow-preview true -y}) 2>&1
+    if ($LASTEXITCODE -ne 0)
+    {
+        throw "Error installing extension connecktedk8s ($connectedK8sPrivateWhlPath) : $errOut"
+    }
+
     $env:HELMREGISTRY="azurearcfork8sdev.azurecr.io/merge/private/azure-arc-k8sagents:0.1.14275-private"
-    az connectedk8s connect -g $resourceGroup -n $clusterName --subscription $subscriptionId --tags $tags --disable-auto-upgrade --enable-oidc-issuer
+    $errOut = $($retVal = & {az connectedk8s connect -g $resourceGroup -n $clusterName --subscription $subscriptionId --tags $tags --disable-auto-upgrade --enable-oidc-issuer}) 2>&1
+    if ($LASTEXITCODE -ne 0)
+    {
+        throw "Arc Connection failed with error : $errOut"
+    }
 
     Verify-ConnectedStatus -clusterName $ClusterName -resourcegroup $ResourceGroupName -subscriptionId $SubscriptionId
 
@@ -200,7 +214,11 @@ if ( $null -eq $azureLogin){
 }
 
 # Ensure `connectedk8s` az cli extension is installed and up to date.
-az extension add --upgrade --name connectedk8s -y
+$errOut = $($retVal = & {az extension add --upgrade --name connectedk8s -y}) 2>&1
+if ($LASTEXITCODE -ne 0)
+{
+    throw "Error upgrading extension connecktedk8s : $errOut"
+}
 
 $installDir = $((Get-Location).Path)
 $productName = "AKS Edge Essentials - K3s"
@@ -327,24 +345,40 @@ if ($retval) {
 
 Write-Host "Step 3: Connect the cluster to Azure" -ForegroundColor Cyan
 # Set the azure subscription
-az account set -s $SubscriptionId
+$errOut = $($retVal = & {az account set -s $SubscriptionId}) 2>&1
+if ($LASTEXITCODE -ne 0)
+{
+    throw "Error setting Subscription ($SubscriptionId): $errOut"
+}
 
 # Create resource group
-$rgExists = az group show --resource-group $ResourceGroupName | Out-Null
+Write-Host "Creating resource group: $ResourceGroupName" -ForegroundColor Cyan
+$errOut = $($retVal = & {az group create --location $Location --resource-group $ResourceGroupName --subscription $SubscriptionId}) 2>&1
+$rgExists = az group show --resource-group $ResourceGroupName
 if ($null -eq $rgExists) {
-    Write-Host "Creating resource group: $ResourceGroupName" -ForegroundColor Cyan
-    az group create --location $Location --resource-group $ResourceGroupName --subscription $SubscriptionId | Out-Null
-} 
+    throw "Error creating ResourceGroup : $errOut"
+}
 
 # Register the required resource providers 
 Write-Host "Registering the required resource providers for AIO" -ForegroundColor Cyan
-az provider register -n "Microsoft.ExtendedLocation"
-az provider register -n "Microsoft.Kubernetes"
-az provider register -n "Microsoft.KubernetesConfiguration"
-az provider register -n "Microsoft.IoTOperationsOrchestrator"
-az provider register -n "Microsoft.IoTOperationsMQ"
-az provider register -n "Microsoft.IoTOperationsDataProcessor"
-az provider register -n "Microsoft.DeviceRegistry"
+$resourceProviders = 
+@(
+    "Microsoft.ExtendedLocation",
+    "Microsoft.Kubernetes",
+    "Microsoft.KubernetesConfiguration",
+    "Microsoft.IoTOperationsOrchestrator",
+    "Microsoft.IoTOperationsMQ",
+    "Microsoft.IoTOperationsDataProcessor",
+    "Microsoft.DeviceRegistry"
+)
+foreach($rp in $resourceProviders)
+{
+    $errOut = $($retVal = & {az provider register -n $rp}) 2>&1
+    if ($LASTEXITCODE -ne 0)
+    {
+        throw "Error creating ResourceGroup : $errOut"
+    }
+}
 
 # Arc-enable the Kubernetes cluster
 Write-Host "Arc enable the kubernetes cluster $ClusterName" -ForegroundColor Cyan
@@ -353,8 +387,18 @@ New-ConnectedCluster -clusterName $ClusterName -location $Location -resourcegrou
 
 # Enable custom location support on your cluster using az connectedk8s enable-features command
 Write-Host "Associate Custom location with $ClusterName cluster"
-$objectId = az ad sp show --id bc313c14-388c-4e7d-a58e-70017303ee3b --query id -o tsv
-az connectedk8s enable-features -n $ClusterName -g $ResourceGroupName --custom-locations-oid $objectId --features cluster-connect custom-locations | Out-Null
+$customLocationsAppId = "bc313c14-388c-4e7d-a58e-70017303ee3b"
+$errOut = $($objectId = & {az ad sp show --id $customLocationsAppId --query id -o tsv}) 2>&1
+if ($null -eq $objectId)
+{
+    throw "Error querying ObjectId for CustomLocationsAppId : $errOut"
+}
+
+$errOut = $($retVal = & {az connectedk8s enable-features -n $ClusterName -g $ResourceGroupName --custom-locations-oid $objectId --features cluster-connect custom-locations}) 2>&1
+if ($LASTEXITCODE -ne 0)
+{
+    throw "Error enabling feature CustomLocations : $errOut"
+}
 
 Write-Host "Step 4: Prep for AIO workload deployment" -ForegroundColor Cyan
 Write-Host "Deploy local path provisioner"
