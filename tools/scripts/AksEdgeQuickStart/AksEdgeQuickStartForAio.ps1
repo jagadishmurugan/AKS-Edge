@@ -16,9 +16,7 @@ param(
     [string] $Tag,
     # Temporary params for private bits
     [Parameter(Mandatory=$true)]
-    [string] $connectedK8sPrivateWhlPath,
-    [Parameter(Mandatory=$true)]
-    [string] $helmPath
+    [string] $connectedK8sPrivateWhlPath
 )
 #Requires -RunAsAdministrator
 New-Variable -Name gAksEdgeQuickStartForAioVersion -Value "1.0.240419.1300" -Option Constant -ErrorAction SilentlyContinue
@@ -147,39 +145,38 @@ param(
         throw "Error installing extension connecktedk8s ($connectedK8sPrivateWhlPath) : $errOut"
     }
 
-    $env:HELMREGISTRY="azurearcfork8sdev.azurecr.io/merge/private/azure-arc-k8sagents:0.1.14275-private"
-    $errOut = $($retVal = & {az connectedk8s connect -g $resourceGroup -n $clusterName --subscription $subscriptionId --tags $tags --disable-auto-upgrade --enable-oidc-issuer}) 2>&1
+    $env:HELMREGISTRY="azurearcfork8sdev.azurecr.io/merge/private/azure-arc-k8sagents:0.1.15060-private"
+    $errOut = $($retVal = & {az connectedk8s connect -g $resourceGroup -n $clusterName --subscription $subscriptionId --tags $tags --disable-auto-upgrade --enable-oidc-issuer --enable-workload-identity}) 2>&1
     if ($LASTEXITCODE -ne 0)
     {
         throw "Arc Connection failed with error : $errOut"
     }
 
+    # For debugging
+    Write-Host "az connectedk8s out : $retVal"
+
     Verify-ConnectedStatus -clusterName $ClusterName -resourcegroup $ResourceGroupName -subscriptionId $SubscriptionId
 
-    $serviceAccountIssuer = az connectedk8s show-issuer-url
+    $errOut = $($obj = & {az connectedk8s show -g $resourceGroup -n $clusterName  | ConvertFrom-Json}) 2>&1
+    if ($null -eq $obj)
+    {
+        throw "Invalid, empty IssuerUrl!"
+    }
+
+    $serviceAccountIssuer = $obj.oidcIssuerProfile.issuerUrl
     if ([string]::IsNullOrEmpty($serviceAccountIssuer))
     {
-        Write-Host "az connectedk8s show-issuer-url returned empty URL!"
-        $jsonString = & kubectl get signingkeys.clusterconfig.azure.com -n azure-arc signingkey -o json
-        $jsonObj = $jsonString | ConvertFrom-Json
-        $serviceAccountIssuer = $jObj.status.clusterIssuerUrl
-        if ([string]::IsNullOrEmpty($serviceAccountIssuer))
-        {
-            throw "Invalid, empty IssuerUrl!"
-        }
+        throw "Invalid, empty IssuerUrl!"
     }
 
     Write-Host "serviceAccountIssuer = $serviceAccountIssuer"
     Restart-ApiServer -serviceAccountIssuer $serviceAccountIssuer -useK8s:$useK8s
-
-    & $helmPath repo add azure-workload-identity https://azure.github.io/azure-workload-identity/charts
-    & $helmPath repo update
-    & $helmPath install workload-identity-webhook azure-workload-identity/workload-identity-webhook --namespace azure-workload-identity-system --create-namespace --set azureTenantID="$tenantId"
 }
 
 # Specify only AIO supported regions
 New-Variable -Option Constant -ErrorAction SilentlyContinue -Name arcLocations -Value @(
-    "eastus", "eastus2", "northeurope", "westeurope", "westus", "westus2", "westus3"
+    # Adding eastus2euap for PublicPreview - might need to remove later
+    "eastus", "eastus2", "northeurope", "westeurope", "westus", "westus2", "westus3", "eastus2euap"
 )
 
 if (! [Environment]::Is64BitProcess) {
@@ -352,11 +349,14 @@ if ($LASTEXITCODE -ne 0)
 }
 
 # Create resource group
-Write-Host "Creating resource group: $ResourceGroupName" -ForegroundColor Cyan
-$errOut = $($retVal = & {az group create --location $Location --resource-group $ResourceGroupName --subscription $SubscriptionId}) 2>&1
-$rgExists = az group show --resource-group $ResourceGroupName
+$errOut = $($rgExists = & {az group show --resource-group $ResourceGroupName}) 2>&1
 if ($null -eq $rgExists) {
-    throw "Error creating ResourceGroup : $errOut"
+    Write-Host "Creating resource group: $ResourceGroupName" -ForegroundColor Cyan
+    $errOut = $($retVal = & {az group create --location $Location --resource-group $ResourceGroupName --subscription $SubscriptionId}) 2>&1
+    if ($LASTEXITCODE -ne 0)
+    {
+        throw "Error creating ResourceGroup ($ResourceGroupName): $errOut"
+    }
 }
 
 # Register the required resource providers 
