@@ -12,6 +12,7 @@ param(
     [String] $ResourceGroupName,
     [ValidateNotNullOrEmpty()]
     [String] $ClusterName,
+    [String] $CustomLocationOid,
     [Switch] $UseK8s=$false,
     [string] $Tag,
     # Temporary params for private bits
@@ -239,7 +240,7 @@ $aideuserConfig = @"
         "ResourceGroupName": "aksedge-rg",
         "ServicePrincipalName": "aksedge-sp",
         "Location": "$Location",
-        "CustomLocationOID":"",
+        "CustomLocationOID":"$CustomLocationOid",
         "EnableWorkloadIdentity": true,
         "Auth":{
             "ServicePrincipalId":"",
@@ -386,14 +387,17 @@ Write-Host "Arc enable the kubernetes cluster $ClusterName" -ForegroundColor Cya
 New-ConnectedCluster -clusterName $ClusterName -location $Location -resourcegroup $ResourceGroupName -subscriptionId $SubscriptionId -connectedK8sPrivateWhlPath $connectedK8sPrivateWhlPath -useK8s:$UseK8s
 
 # Enable custom location support on your cluster using az connectedk8s enable-features command
-Write-Host "Associate Custom location with $ClusterName cluster"
-$customLocationsAppId = "bc313c14-388c-4e7d-a58e-70017303ee3b"
-$errOut = $($objectId = & {az ad sp show --id $customLocationsAppId --query id -o tsv}) 2>&1
-if ($null -eq $objectId)
+$objectId = $CustomLocationOid
+if ([string]::IsNullOrEmpty($objectId))
 {
-    throw "Error querying ObjectId for CustomLocationsAppId : $errOut"
+    Write-Host "Associate Custom location with $ClusterName cluster"
+    $customLocationsAppId = "bc313c14-388c-4e7d-a58e-70017303ee3b"
+    $errOut = $($objectId = & {az ad sp show --id $customLocationsAppId --query id -o tsv}) 2>&1
+    if ($null -eq $objectId)
+    {
+        throw "Error querying ObjectId for CustomLocationsAppId : $errOut"
+    }
 }
-
 $errOut = $($retVal = & {az connectedk8s enable-features -n $ClusterName -g $ResourceGroupName --custom-locations-oid $objectId --features cluster-connect custom-locations}) 2>&1
 if ($LASTEXITCODE -ne 0)
 {
