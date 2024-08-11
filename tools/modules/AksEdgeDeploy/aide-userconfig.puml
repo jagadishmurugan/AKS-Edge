@@ -40,7 +40,10 @@ jsonDiagram {
         "Auth": {
             "ServicePrincipalId" : "GUID",
             "Password" : "String"
-        }
+        },
+        "EnableWorkloadIdentity" : "Boolean",
+        "EnableKeyManagement" : "Boolean",
+        "GatewayResourceId": "String"
     }
     ,
     "InstallOptions":{

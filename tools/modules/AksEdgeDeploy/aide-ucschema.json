@@ -72,6 +72,15 @@
                             "description": "Password corresponding to ServicePrincipalId to onboard Arc-enabled Server/Kubernetes"
                         }
                     }
+                },
+                "EnableWorkloadIdentity": {
+                    "type": "boolean"
+                },
+                "EnableKeyManagement": {
+                    "type": "boolean"
+                },
+                "GatewayResourceId": {
+                    "type": "string"
                 }
             }
         },
