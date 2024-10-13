@@ -51,7 +51,8 @@ function Restart-ApiServer
 param(
     [Parameter(Mandatory=$true)]
     [string] $serviceAccountIssuer,
-    [Switch] $useK8s=$false
+    [Switch] $useK8s=$false,
+    [Switch] $enableKeyManagement=$false
 )
 
     Write-Host "serviceAccountIssuer = $serviceAccountIssuer"
@@ -59,6 +60,11 @@ param(
     if ($useK8s)
     {
         Invoke-AksEdgeNodeCommand -command "sudo cat /etc/kubernetes/manifests/kube-apiserver.yaml | tee /home/aksedge-user/kube-apiserver.yaml | tee /home/aksedge-user/kube-apiserver.yaml.working > /dev/null"
+        if ($enableKeyManagement)
+        {
+            # TODO
+        }
+
         Invoke-AksEdgeNodeCommand -command "sudo sed -i 's|service-account-issuer.*|service-account-issuer=$serviceAccountIssuer|' /home/aksedge-user/kube-apiserver.yaml"
         Invoke-AksEdgeNodeCommand -command "sudo cp /home/aksedge-user/kube-apiserver.yaml /etc/kubernetes/manifests/kube-apiserver.yaml"
         & kubectl delete pod -n kube-system -l component=kube-apiserver
@@ -66,6 +72,12 @@ param(
     else
     {
         Invoke-AksEdgeNodeCommand -command "sudo cat /var/.eflow/config/k3s/k3s-config.yml | tee /home/aksedge-user/k3s-config.yml | tee /home/aksedge-user/k3s-config.yml.working > /dev/null"
+        if ($enableKeyManagement)
+        {
+            Invoke-AksEdgeNodeCommand -command "sudo sed -i '/kube-apiserver-arg:/a\  - service-account-max-token-expiration=1h00m0s\' /home/aksedge-user/k3s-config.yml"
+            Invoke-AksEdgeNodeCommand -command "sudo sed -i '/kube-apiserver-arg:/a\  - service-account-extend-token-expiration=false\' /home/aksedge-user/k3s-config.yml"
+        }
+
         Invoke-AksEdgeNodeCommand -command "sudo sed -i 's|service-account-issuer.*|service-account-issuer=$serviceAccountIssuer|' /home/aksedge-user/k3s-config.yml"
         Invoke-AksEdgeNodeCommand -command "sudo cp /home/aksedge-user/k3s-config.yml /var/.eflow/config/k3s/k3s-config.yml"
         Invoke-AksEdgeNodeCommand -command "sudo systemctl restart k3s.service"
@@ -206,7 +218,7 @@ param(
     # For debugging
     Write-Host "az connectedk8s out : $retVal"
 
-    Verify-ConnectedStatus -clusterName $ClusterName -resourcegroup $arcArgs.ResourceGroupName -subscriptionId $arcArgs.SubscriptionId -enableWorkloadIdentity:$arcArgs.EnableWorkloadIdentity
+    Verify-ConnectedStatus -clusterName $clusterName -resourcegroup $arcArgs.ResourceGroupName -subscriptionId $arcArgs.SubscriptionId -enableWorkloadIdentity:$arcArgs.EnableWorkloadIdentity
 
     if ($arcArgs.EnableWorkloadIdentity)
     {
@@ -223,7 +235,18 @@ param(
         }
 
         Write-Host "serviceAccountIssuer = $serviceAccountIssuer"
-        Restart-ApiServer -serviceAccountIssuer $serviceAccountIssuer -useK8s:$useK8s
+
+        if ($arcArgs.enableKeyManagement)
+        {
+            "Creating KeyRotation extension..."
+            az k8s-extension create -g $arcArgs.ResourceGroupName -c $clusterName -n saKeyRotation --extension-type microsoft.hybridaks.sakeyrotation -t connectedClusters --version 0.7.0 --auto-upgrade-minor-version false --release-train dev
+        }
+
+        if ($restartApiServer)
+        {
+            Write-Host "Restarting ApiServer..."
+            Restart-ApiServer -serviceAccountIssuer $serviceAccountIssuer -useK8s:$useK8s -enableKeyManagement:$arcArgs.EnableKeyManagement
+        }
     }
 }
 
