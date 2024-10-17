@@ -21,7 +21,7 @@ New-Variable -Name gAksEdgeQuickStartForAioVersion -Value "1.0.240904.1500" -Opt
 
 # Specify only AIO supported regions
 New-Variable -Option Constant -ErrorAction SilentlyContinue -Name arcLocations -Value @(
-    "eastus", "eastus2", "northeurope", "westeurope", "westus", "westus2", "westus3"
+    "eastus", "eastus2", "northeurope", "westeurope", "westus", "westus2", "westus3", "eastus2euap", "centraluseuap"
 )
 
 function Wait-ApiServerReady
@@ -242,11 +242,8 @@ param(
             az k8s-extension create -g $arcArgs.ResourceGroupName -c $clusterName -n saKeyRotation --extension-type microsoft.hybridaks.sakeyrotation -t connectedClusters --version 0.7.0 --auto-upgrade-minor-version false --release-train dev
         }
 
-        if ($restartApiServer)
-        {
-            Write-Host "Restarting ApiServer..."
-            Restart-ApiServer -serviceAccountIssuer $serviceAccountIssuer -useK8s:$useK8s -enableKeyManagement:$arcArgs.EnableKeyManagement
-        }
+        Write-Host "Restarting ApiServer..."
+        Restart-ApiServer -serviceAccountIssuer $serviceAccountIssuer -useK8s:$useK8s -enableKeyManagement:$arcArgs.EnableKeyManagement
     }
 }
 
