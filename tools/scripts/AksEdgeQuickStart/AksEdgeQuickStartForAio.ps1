@@ -2,26 +2,33 @@
   QuickStart script for setting up Azure for AKS Edge Essentials and deploying the same on the Windows device
 #>
 param(
-    [ValidateNotNullOrEmpty()]
+    [string]$arcFederatedToken,
+    [string]$msiUrl,
     [String] $SubscriptionId,
-    [ValidateNotNullOrEmpty()]
     [String] $TenantId,
-    [ValidateNotNullOrEmpty()]
     [String] $Location,
-    [ValidateNotNullOrEmpty()]
     [String] $ResourceGroupName,
-    [ValidateNotNullOrEmpty()]
     [String] $ClusterName,
     [String] $CustomLocationOid,
     [Switch] $UseK8s=$false,
     [string] $Tag
 )
+
+$SubscriptionId = $env:arcSubscriptionId
+$TenantId = $env:arcTenantId
+$Location = $env:arcLocation
+$ResourceGroupName = $env:arcResourceGroup
+$ClusterName = $Env:clusterName
+$CustomLocationOid = "51dfe1e8-70c6-4de5-a08e-e18aff23d815"
+# TODO: shold we set Tag as constant?
+$UseK8s=$false
+
 #Requires -RunAsAdministrator
-New-Variable -Name gAksEdgeQuickStartForAioVersion -Value "1.0.240904.1500" -Option Constant -ErrorAction SilentlyContinue
+New-Variable -Name gAksEdgeQuickStartForAioVersion -Value "1.0.241101.1500" -Option Constant -ErrorAction SilentlyContinue
 
 # Specify only AIO supported regions
 New-Variable -Option Constant -ErrorAction SilentlyContinue -Name arcLocations -Value @(
-    "eastus", "eastus2", "northeurope", "westeurope", "westus", "westus2", "westus3"
+    "eastus", "eastus2", "northeurope", "westeurope", "westus", "westus2", "westus3", "eastus2euap", "centraluseuap"
 )
 
 function Wait-ApiServerReady
@@ -218,6 +225,13 @@ if ($arcLocations -inotcontains $Location) {
     Write-Host "Supported Locations : $arcLocations"
     exit -1
 }
+
+# The federated token is short lived so convert it immediately to tokens with longer lifetime.
+# Convert federated token to ARM access token
+az login --service-principal --username $Env:arcAppId --federated-token "$arcFederatedToken" --tenant $Env:arcTenantId
+
+# Acquire a key vault scoped access token before the federated token expires
+az account get-access-token --scope https://vault.azure.net/.default --output none
 
 # Validate az cli version.
 $azVersion = (az version)[1].Split(":")[1].Split('"')[1]
