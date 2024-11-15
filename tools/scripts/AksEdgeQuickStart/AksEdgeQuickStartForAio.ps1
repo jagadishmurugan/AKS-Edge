@@ -450,6 +450,8 @@ foreach($rp in $resourceProviders)
     }
 }
 
+Write-Host "Copy kubectl.exe"
+mkdir -p "$env:USERPROFILE\.azure\kubectl-client"
 cp "C:\Program Files\AksEdge\kubectl.exe" "$env:USERPROFILE\.azure\kubectl-client"
 
 # Arc-enable the Kubernetes cluster
