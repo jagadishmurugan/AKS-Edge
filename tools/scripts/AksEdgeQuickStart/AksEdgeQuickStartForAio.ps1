@@ -220,7 +220,7 @@ param(
         if ($arcArgs.enableKeyManagement)
         {
             "Creating KeyRotation extension..."
-            az k8s-extension create -g $arcArgs.ResourceGroupName -c $clusterName -n saKeyRotation --extension-type microsoft.arc.kuberneteskeymanager -t connectedClusters --version 1.0.195-dev --auto-upgrade-minor-version false --release-train staging --debug --config-settings reconcileInterval=0h10m0s maxTokenLifeTime=1h0m0s keyLifeTime=1h0m0s keyPropagationTime=1h0m0s keyLifeTimeRatio=1 keyDeprecationMultipler=1
+            az k8s-extension create -g $arcArgs.ResourceGroupName -c $clusterName -n saKeyRotation --extension-type microsoft.arc.kuberneteskeymanager -t connectedClusters --version 1.0.195-dev --auto-upgrade-minor-version false --release-train staging --debug --config-settings env.reconcileInterval=0h10m0s env.maxTokenLifeTime=1h0m0s env.keyLifeTime=2h0m0s env.keyPropagationTime=1h0m0s env.keyLifeTimeRatio=.5 env.keyDeprecationMultipler=1
         }
 
         Write-Host "Restarting ApiServer..."
