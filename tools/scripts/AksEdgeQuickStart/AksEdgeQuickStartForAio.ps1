@@ -4,6 +4,7 @@
 param(
     [String] $aideUserConfigfile,
     [String] $aksedgeConfigFile,
+    [string] $branch = "jagadishmurugan",
     [string] $Tag
 )
 #Requires -RunAsAdministrator
@@ -527,7 +528,7 @@ try {
     Start-Transcript -Path $transcriptFile
 
     Write-Host "Step 1 : Azure/AKS-Edge repo setup" -ForegroundColor Cyan
-    $workdir = SetupAksEdgeRepo -installDir $installDir -Tag $Tag
+    $workdir = SetupAksEdgeRepo -installDir $installDir -branch $branch -Tag $Tag
 
     Write-Host "Step 2 : Ensure Deployment prerequisites"
     if ([string]::IsNullOrEmpty($aideUserConfigFile))
