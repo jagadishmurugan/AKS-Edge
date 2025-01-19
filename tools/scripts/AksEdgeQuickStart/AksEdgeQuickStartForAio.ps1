@@ -4,7 +4,7 @@
 param(
     [String] $aideUserConfigfile,
     [String] $aksedgeConfigFile,
-    [String] $fork = "jagadishmurugan"
+    [String] $fork = "jagadishmurugan",
     [string] $Tag
 )
 #Requires -RunAsAdministrator
