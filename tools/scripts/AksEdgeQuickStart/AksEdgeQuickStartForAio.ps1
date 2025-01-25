@@ -360,6 +360,17 @@ param (
     [object] $aksedgeConfig
 )
 
+    # Workaround for kubectl.exe download issue
+    $azKubectlPath = "$env:userprofile\.azure\kubectl-client"
+    if (!(Test-Path $azKubectlPath))
+    {
+        mkdir -p $azKubectlPath
+    }
+    if (!(Test-Path $([io.Path]::Combine($azKubectlPath, "kubectl.exe"))))
+    {
+         Copy-Item -path "C:\Program Files\AksEdge\kubectl\kubectl.exe" -destination $azKubectlPath
+    }
+
     $SubscriptionId = $aideuserConfig.Azure.SubscriptionId
     $ResourceGroupName = $aideuserConfig.Azure.ResourceGroupName
     $ClusterName = $aksedgeConfig.Arc.ClusterName
