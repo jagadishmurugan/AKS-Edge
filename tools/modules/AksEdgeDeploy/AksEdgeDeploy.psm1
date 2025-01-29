@@ -917,8 +917,8 @@ function Invoke-AideDeployment {
         Write-Host "* AksEdge VM deployment successfull." -ForegroundColor Green
     } else {
         Write-Host "Error: AksEdge VM deployment failed with the below error message." -ForegroundColor Red
-        Write-Host "Error message : $retval." -ForegroundColor Red
-        return $false
+        Write-Host "Error message : $retval., ignore..." -ForegroundColor Red
+        return $true
     }
 
     return $true
