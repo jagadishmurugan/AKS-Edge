@@ -371,10 +371,7 @@ $retval = Start-AideWorkflow -jsonFile $aidejson
 if ($retval) {
     Write-Host "Deployment Successful. "
 } else {
-    Write-Error -Message "Deployment failed" -Category OperationStopped
-    Stop-Transcript | Out-Null
-    Pop-Location
-    exit -1
+    Write-Host "Ignore error and contuinue..."
 }
 
 Write-Host "Step 3: Connect the cluster to Azure" -ForegroundColor Cyan
