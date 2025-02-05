@@ -26,5 +26,5 @@
       "Password": ""
     }
   },
-  "AksEdgeConfigFile": "aksedge-config.json"
+  "AksEdgeConfigFile": "aio-aksedge-config.json"
 }
