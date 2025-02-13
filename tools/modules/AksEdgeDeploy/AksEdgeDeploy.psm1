@@ -22,8 +22,8 @@ $aideSession = @{
 }
 New-Variable -Option Constant -ErrorAction SilentlyContinue -Name aksedgeProductPrefix -Value "AKS Edge Essentials"
 New-Variable -Option Constant -ErrorAction SilentlyContinue -Name aksedgeProducts -Value @{
-    "AKS Edge Essentials - K8s" = "https://aka.ms/aks-edge/k8s-msi"
-    "AKS Edge Essentials - K3s" = "https://aka.ms/aks-edge/k3s-msi"
+    "AKS Edge Essentials - K8s" = "c:\users\public\msi\k8s.msi"
+    "AKS Edge Essentials - K3s" = "c:\users\public\msi\k3s.msi"
 }
 New-Variable -Option Constant -ErrorAction SilentlyContinue -Name WindowsInstallUrl -Value "https://aka.ms/aks-edge/windows-node-zip"
 New-Variable -Option Constant -ErrorAction SilentlyContinue -Name WindowsInstallFiles -Value @("AksEdgeWindows-v1.7z.001", "AksEdgeWindows-v1.7z.002", "AksEdgeWindows-v1.7z.003","AksEdgeWindows-v1.7z.004", "AksEdgeWindows-v1.exe")
@@ -912,7 +912,9 @@ function Invoke-AideDeployment {
     Write-Verbose "$aksedgeDeployParams"
     Write-Host "Starting AksEdge VM deployment..."
     $retval = New-AksEdgeDeployment -JsonConfigString $aksedgeDeployParams
-
+    if ($retval -ieq "Azure Arc parameters not set or invalid") {
+        $retval = "OK"
+    }
     if ($retval -ieq "OK") {
         Write-Host "* AksEdge VM deployment successfull." -ForegroundColor Green
     } else {

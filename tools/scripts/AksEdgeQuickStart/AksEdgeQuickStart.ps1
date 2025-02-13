@@ -83,11 +83,14 @@ $aideuserConfig = @"
 "@
 $aksedgeConfig = @"
 {
-    "SchemaVersion": "1.14",
+    "SchemaVersion": "1.15",
     "Version": "1.0",
     "DeploymentType": "SingleMachineCluster",
     "Init": {
-        "ServiceIPRangeSize": 10
+        "ServiceIPRangeSize": 10,
+        "KmsPlugin": {
+            "Enable": true
+        }
     },
     "Network": {
         "NetworkPlugin": "$networkplugin",
