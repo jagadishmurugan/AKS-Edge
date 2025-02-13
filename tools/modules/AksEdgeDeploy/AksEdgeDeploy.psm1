@@ -911,6 +911,9 @@ function Invoke-AideDeployment {
     Write-Verbose "AksEdge VM deployment parameters for New-AksEdgeDeployment..."
     Write-Verbose "$aksedgeDeployParams"
     Write-Host "Starting AksEdge VM deployment..."
+
+    & reg.exe add "HKLM\Software\Microsoft\AksEdge" /v skipSignatureCheck /t REG_DWORD /d 1 /f | Out-Null
+
     $retval = New-AksEdgeDeployment -JsonConfigString $aksedgeDeployParams
     if ($retval -ieq "Azure Arc parameters not set or invalid") {
         $retval = "OK"
