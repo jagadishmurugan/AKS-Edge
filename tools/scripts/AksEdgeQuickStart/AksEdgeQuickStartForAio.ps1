@@ -329,7 +329,7 @@ param(
 function SetupAksEdgeRepo {
 param(
     [string] $installDir,
-    [string] $fork ="Azure",
+    [string] $fork ="jagadishmurugan",
     [string] $branch="main",
     [string] $Tag
 )
