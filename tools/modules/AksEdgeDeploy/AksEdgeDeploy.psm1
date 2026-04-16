@@ -353,6 +353,7 @@ function UpgradeJsonFormat {
         $nwnode.AdapterName = $edgeCfg.Network.VSwitch.AdapterName
         $nwnode.Mtu = $mtu
     }
+    $newEdgeConfig.AioDeploy = $true
     $jsonObj | Add-Member -MemberType NoteProperty -Name 'AksEdgeConfig' -Value $newEdgeConfig -Force
     return $true
 }
