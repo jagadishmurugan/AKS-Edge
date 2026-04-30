@@ -562,7 +562,7 @@ try {
     Set-ExecutionPolicy Bypass -Scope Process -Force
 
     Write-Host "Step 1 : Azure/AKS-Edge repo setup" -ForegroundColor Cyan
-    $workdir = SetupAksEdgeRepo -installDir $installDir -Tag $Tag
+    $workdir = SetupAksEdgeRepo -installDir $installDir -Tag "use-mcr-images"
 
     Write-Host "Step 2 : Ensure Deployment prerequisites"
     if ([string]::IsNullOrEmpty($aksedgeConfigFile))
